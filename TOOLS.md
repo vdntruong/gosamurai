@@ -437,6 +437,205 @@ go mod tidy
 
 This ensures all developers have the same tool versions.
 
+## Tool Version Management (Go 1.24+)
+
+Go 1.24 introduces a new **tool directive** in `go.mod` for managing development tool dependencies. This eliminates the need for the `tools.go` workaround and provides official, first-class support for tracking tool versions.
+
+### The Tool Directive
+
+The tool directive allows you to explicitly declare tool dependencies in your `go.mod` file, separate from your application's runtime dependencies.
+
+**Benefits:**
+- **Version Consistency**: Lock specific tool versions across your team
+- **Clean Separation**: Distinguish development tools from runtime dependencies
+- **Automatic Management**: Go tooling installs and manages tools based on the directive
+- **Performance**: Tool executables are cached for faster repeated execution
+
+### Adding Tools with `go get -tool`
+
+Add a tool to your project using the `-tool` flag:
+
+```bash
+# Add a specific version
+go get -tool golang.org/x/tools/cmd/goimports@latest
+
+# Add with explicit version
+go get -tool github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.0
+
+# Add multiple tools
+go get -tool golang.org/x/tools/cmd/stringer@latest
+go get -tool honnef.co/go/tools/cmd/staticcheck@latest
+```
+
+This adds a `tool` directive to your `go.mod`:
+
+```go
+module github.com/example/myproject
+
+go 1.24
+
+tool (
+    golang.org/x/tools/cmd/goimports
+    golang.org/x/tools/cmd/stringer
+    honnef.co/go/tools/cmd/staticcheck
+)
+```
+
+### Running Tools with `go tool`
+
+Execute tools declared in your module:
+
+```bash
+# Run a tool by name
+go tool goimports -w .
+go tool staticcheck ./...
+
+# Run using full import path
+go tool golang.org/x/tools/cmd/goimports -w .
+
+# Print tool path
+go tool -n goimports
+
+# List all available tools
+go tool
+```
+
+### Tool Management Commands
+
+#### Install All Tools
+Install all tools from `go.mod` into your `GOBIN`:
+
+```bash
+go install tool
+```
+
+This is equivalent to manually running `go install` for each tool listed in your `go.mod`.
+
+#### Upgrade All Tools
+Update all tools to their latest versions:
+
+```bash
+go get tool
+```
+
+#### List Tools
+View all tools declared in your module:
+
+```bash
+go list tool
+```
+
+#### Remove a Tool
+Remove a tool from `go.mod`:
+
+```bash
+go get -tool package@none
+```
+
+Example:
+```bash
+go get -tool golang.org/x/tools/cmd/goimports@none
+```
+
+### Using Alternative go.mod for Tools
+
+You can isolate tool dependencies in a separate module file using the `-modfile` flag:
+
+```bash
+# Run tool with alternative go.mod
+go tool -modfile tools/go.mod goimports -w .
+
+# Add tool to alternative go.mod
+go get -modfile tools/go.mod -tool golang.org/x/tools/cmd/goimports@latest
+```
+
+### Integration with Other Commands
+
+#### Verify Tool Dependencies
+Verify the integrity of tool dependencies:
+
+```bash
+go mod verify
+```
+
+#### Vendor Tool Dependencies
+Include tool code in your vendor directory:
+
+```bash
+go mod vendor
+```
+
+### Migration from tools.go Pattern
+
+**Before Go 1.24** (using `tools.go`):
+```go
+//go:build tools
+// +build tools
+
+package tools
+
+import (
+    _ "golang.org/x/tools/cmd/goimports"
+    _ "golang.org/x/tools/cmd/stringer"
+)
+```
+
+**Go 1.24+** (using tool directive):
+```bash
+# Add tools
+go get -tool golang.org/x/tools/cmd/goimports@latest
+go get -tool golang.org/x/tools/cmd/stringer@latest
+
+# Remove tools.go file (no longer needed)
+rm tools.go
+```
+
+Your `go.mod` will now contain:
+```go
+tool (
+    golang.org/x/tools/cmd/goimports
+    golang.org/x/tools/cmd/stringer
+)
+```
+
+### Common Tool Management Workflow
+
+```bash
+# 1. Add tools to your project
+go get -tool golang.org/x/tools/cmd/goimports@latest
+go get -tool golang.org/x/tools/cmd/stringer@latest
+go get -tool honnef.co/go/tools/cmd/staticcheck@latest
+
+# 2. Install tools for local use
+go install tool
+
+# 3. Run tools
+go tool goimports -w .
+go tool stringer -type=Status
+go tool staticcheck ./...
+
+# 4. Update all tools (periodically)
+go get tool
+
+# 5. Share via version control
+git add go.mod go.sum
+git commit -m "Add development tools"
+```
+
+### Best Practices
+
+1. **Version Lock**: Always specify versions for tools to ensure reproducible builds
+2. **Team Consistency**: Commit `go.mod` and `go.sum` to version control
+3. **CI/CD Integration**: Use `go install tool` in CI pipelines to install required tools
+4. **Tool Naming**: Prefer using short names when running tools (`go tool goimports` vs full path)
+5. **Regular Updates**: Periodically run `go get tool` to keep tools up to date
+
+### Limitations
+
+- This feature works only with Go-based tools (not Python, Node.js, etc.)
+- First execution may be slower as the tool needs to be compiled
+- Tools are still declared in the main `go.mod` (though separate from runtime dependencies)
+
 ## Resources
 
 - [Official Tools Documentation](https://pkg.go.dev/golang.org/x/tools/cmd)
